@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelForge — 图片处理工坊</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0e12;
+  --bg-raised: #16161d;
+  --bg-card: #1c1c26;
+  --fg: #e8e6e3;
+  --fg-muted: #8a8895;
+  --accent: #f59e0b;
+  --accent-dim: rgba(245, 158, 11, 0.15);
+  --accent-glow: rgba(245, 158, 11, 0.3);
+  --danger: #ef4444;
+  --success: #22c55e;
+  --border: #2a2a38;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Noto Sans SC', 'Space Grotesk', sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 背景氛围 */
+body::before {
+  content: '';
+  position: fixed;
+  top: -200px; right: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -300px; left: -200px;
+  width: 800px; height: 800px;
+  background: radial-gradient(circle, rgba(139,92,246,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 噪点纹理 */
+.noise {
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+
+/* Header */
+header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, var(--accent), #d97706);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+.header-text h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px; font-weight: 700;
+  background: linear-gradient(135deg, var(--fg), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+.header-text p { color: var(--fg-muted); font-size: 14px; margin-top: 2px; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 4px;
+  background: var(--bg-raised);
+  border-radius: var(--radius);
+  padding: 4px;
+  margin-bottom: 32px;
+  border: 1px solid var(--border);
+}
+.tab {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.tab:hover { color: var(--fg); background: rgba(255,255,255,0.03); }
+.tab.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+.tab .tab-icon { font-size: 18px; }
+
+/* Panel */
+.panel { display: none; }
+.panel.active { display: block; animation: fadeUp 0.35s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: 16px; font-weight: 600;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(255,255,255,0.01);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.upload-zone .upload-icon { font-size: 48px; margin-bottom: 12px; }
+.upload-zone .upload-title { font-size: 16px; font-weight: 500; color: var(--fg); margin-bottom: 4px; }
+.upload-zone .upload-sub { font-size: 13px; color: var(--fg-muted); }
+.upload-zone input[type="file"] { display: none; }
+
+/* Preview */
+.preview-area {
+  margin-top: 20px;
+  display: flex; flex-wrap: wrap; gap: 12px;
+  justify-content: center;
+}
+.preview-item {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  animation: scaleIn 0.3s ease;
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.preview-item img {
+  display: block;
+  max-width: 280px; max-height: 280px;
+  object-fit: contain;
+}
+.preview-item .remove-btn {
+  position: absolute; top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: var(--danger);
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+}
+.preview-item:hover .remove-btn { opacity: 1; }
+.preview-item .img-info {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  padding: 20px 10px 8px;
+  font-size: 11px; color: var(--fg-muted);
+}
+
+/* Controls */
+.control-row {
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.control-group {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.control-group label {
+  font-size: 12px; color: var(--fg-muted); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+select, input[type="number"] {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+select:focus, input[type="number"]:focus { border-color: var(--accent); }
+select { cursor: pointer; padding-right: 32px; }
+input[type="number"] { width: 100px; }
+
+/* Quality slider */
+.quality-control {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 8px;
+}
+.quality-control input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+}
+.quality-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.quality-control .quality-val {
+  font-size: 14px; font-weight: 600;
+  color: var(--accent);
+  min-width: 40px; text-align: right;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: inherit;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: var(--bg-raised);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--fg-muted); }
+
+.btn-danger {
+  background: rgba(239,68,68,0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.3);
+}
+.btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+.actions-bar {
+  display: flex; gap: 12px; margin-top: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ============ 裁剪编辑器 - 约束式 ============ */
+.crop-editor {
+  display: flex; gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.crop-preview-wrap {
+  flex: 1; min-width: 280px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.crop-preview-wrap canvas {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.crop-controls {
+  flex: 0 0 320px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.crop-info-box {
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+.crop-info-box h4 {
+  font-size: 13px; color: var(--fg-muted); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.crop-info-box .size-display {
+  font-size: 20px; font-weight: 700; color: var(--accent);
+  font-family: 'Space Grotesk', sans-serif;
+}
+.crop-info-box .size-display span { color: var(--fg-muted); font-weight: 400; }
+
+/* 数值输入网格 */
+.crop-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.crop-inputs .input-group {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.crop-inputs .input-group label {
+  font-size: 11px; color: var(--fg-muted); font-weight: 500;
+}
+.crop-inputs .input-group input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: 'Space Grotesk', monospace;
+  outline: none;
+}
+.crop-inputs .input-group input:focus {
+  border-color: var(--accent);
+}
+
+/* 比例锁定 */
+.ratio-lock {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.ratio-lock label {
+  font-size: 13px; color: var(--fg-muted);
+}
+.ratio-lock select {
+  flex: 1;
+}
+.lock-indicator {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+}
+.lock-indicator.locked {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.lock-indicator.unlocked {
+  background: rgba(255,255,255,0.05);
+  color: var(--fg-muted);
+}
+
+/* 裁剪快捷按钮 */
+.crop-presets {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.preset-btn {
+  padding: 8px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.preset-btn:hover { border-color: var(--fg-muted); }
+.preset-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Split preview grid */
+.split-preview {
+  margin-top: 20px;
+  display: grid;
+  gap: 4px;
+  background: var(--bg);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.split-preview img {
+  width: 100%; display: block;
+  border-radius: 4px;
+}
+.split-n-selector {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+}
+.split-n-btn {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  border: 2px solid var(--border);
+  color: var(--fg);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.split-n-btn:hover { border-color: var(--fg-muted); }
+.split-n-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.split-n-label {
+  font-size: 11px; color: var(--fg-muted); text-align: center;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed; top: 24px; right: 24px;
+  z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 14px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideIn 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  max-width: 360px;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.toast.success { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+.toast.error { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+.toast.info { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(245,158,11,0.3); }
+
+/* Processing overlay */
+.processing {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  align-items: center; justify-content: center;
+}
+.processing.show { display: flex; }
+.processing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 48px;
+  text-align: center;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.processing-text { color: var(--fg-muted); font-size: 14px; }
+
+/* Responsive */
+@media (max-width: 800px) {
+  .crop-editor { flex-direction: column; }
+  .crop-controls { flex: none; width: 100%; }
+}
+@media (max-width: 640px) {
+  .app { padding: 16px 12px 60px; }
+  header h1 { font-size: 22px; }
+  .tabs { flex-direction: column; }
+  .control-row { flex-direction: column; align-items: stretch; }
+  .preview-item img { max-width: 200px; max-height: 200px; }
+  .crop-inputs { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<div class="app">
+  <header>
+    <div class="logo">⚡</div>
+    <div class="header-text">
+      <h1>PixelForge</h1>
+      <p>格式转换 · 裁剪 · 等分拆分 — 纯浏览器端处理</p>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="convert"><span class="tab-icon">🔄</span> 格式转换</button>
+    <button class="tab" data-tab="crop"><span class="tab-icon">✂️</span> 裁剪</button>
+    <button class="tab" data-tab="split"><span class="tab-icon">🔲</span> 等分拆分</button>
+  </div>
+
+  <!-- ========== 格式转换 ========== -->
+  <div class="panel active" id="panel-convert">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>上传图片</div>
+      <div class="upload-zone" id="convert-upload">
+        <div class="upload-icon">📁</div>
+        <div class="upload-title">点击或拖放图片到此处</div>
+        <div class="upload-sub">支持 PNG / JPG / WebP / BMP / GIF，可批量选择</div>
+        <input type="file" id="convert-file" multiple accept="image/*">
+      </div>
+      <div class="preview-area" id="convert-preview"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>输出设置</div>
+      <div class="control-row">
+        <div class="control-group">
+          <label>目标格式</label>
+          <select id="convert-format">
+            <option value="image/png">PNG</option>
+            <option value="image/jpeg">JPG</option>
+            <option value="image/webp">WebP</option>
+            <option value="image/bmp">BMP</option>
+          </select>
+        </div>
+        <div class="control-group" id="quality-group">
+          <label>压缩质量</label>
+          <div class="quality-control">
+            <input type="range" id="convert-quality" min="10" max="100" value="92">
+            <span class="quality-val" id="convert-quality-val">92%</span>
+          </div>
+        </div>
+      </div>
+      <div class="actions-bar">
+        <button class="btn btn-primary" id="convert-btn" disabled>🔄 批量转换并下载</button>
+        <button class="btn btn-secondary" id="convert-clear">🗑️ 清空</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 裁剪（约束式） ========== -->
+  <div class="panel" id="panel-crop">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>选择图片</div>
+      <div class="upload-zone" id="crop-upload">
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-title">点击或拖放一张图片</div>
+        <div class="upload-sub">选择需要裁剪的图片</div>
+        <input type="file" id="crop-file" accept="image/*">
+      </div>
+    </div>
+
+    <div class="card" id="crop-editor-card" style="display:none;">
+      <div class="card-title"><span class="dot"></span>精确裁剪</div>
+      
+      <div class="crop-editor">
+        <!-- 预览区 -->
+        <div class="crop-preview-wrap">
+          <canvas id="crop-canvas"></canvas>
+        </div>
+        
+        <!-- 控制区 -->
+        <div class="crop-controls">
+          <!-- 输出尺寸显示 -->
+          <div class="crop-info-box">
+            <h4>输出尺寸</h4>
+            <div class="size-display">
+              <span id="crop-out-w">0</span> <span>×</span> <span id="crop-out-h">0</span> <span>px</span>
+            </div>
+          </div>
+          
+          <!-- 数值输入 -->
+          <div class="crop-info-box">
+            <h4>裁剪坐标与尺寸</h4>
+            <div class="crop-inputs">
+              <div class="input-group">
+                <label>X 起点</label>
+                <input type="number" id="crop-x" min="0" value="0">
+              </div>
+              <div class="input-group">
+                <label>Y 起点</label>
+                <input type="number" id="crop-y" min="0" value="0">
+              </div>
+              <div class="input-group">
+                <label>宽度</label>
+                <input type="number" id="crop-w" min="1" value="100">
+              </div>
+              <div class="input-group">
+                <label>高度</label>
+                <input type="number" id="crop-h" min="1" value="100">
+              </div>
+            </div>
+          </div>
+          
+          <!-- 比例锁定 -->
+          <div class="ratio-lock">
+            <label>锁定比例</label>
+            <select id="crop-ratio">
+              <option value="0">自由</option>
+              <option value="1">1:1</option>
+              <option value="1.333">4:3</option>
+              <option value="1.778">16:9</option>
+              <option value="0.75">3:4</option>
+              <option value="0.5625">9:16</option>
+              <option value="2.35">2.35:1</option>
+              <option value="1.618">黄金比</option>
+            </select>
+            <div class="lock-indicator unlocked" id="lock-indicator">
+              <span>🔓</span> 未锁定
+            </div>
+          </div>
+          
+          <!-- 快捷预设 -->
+          <div class="crop-info-box">
+            <h4>快捷预设</h4>
+            <div class="crop-presets">
+              <button class="preset-btn" data-preset="full">全图</button>
+              <button class="preset-btn" data-preset="center-50">中心 50%</button>
+              <button class="preset-btn" data-preset="center-75">中心 75%</button>
+              <button class="preset-btn" data-preset="top-half">上半部</button>
+              <button class="preset-btn" data-preset="bottom-half">下半部</button>
+            </div>
+          </div>
+          
+          <!-- 输出设置 -->
+          <div class="crop-info-box">
+            <h4>输出设置</h4>
+            <div class="control-row" style="margin-top:8px;">
+              <div class="control-group">
+                <label>格式</label>
+                <select id="crop-format">
+                  <option value="image/png">PNG</option>
+                  <option value="image/jpeg">JPG</option>
+                  <option value="image/webp">WebP</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label>质量</label>
+                <input type="range" id="crop-quality" min="10" max="100" value="95" style="width:100px;">
+              </div>
+            </div>
+          </div>
+          
+          <!-- 操作按钮 -->
+          <div class="actions-bar" style="margin-top:0;">
+            <button class="btn btn-primary" id="crop-btn">✂️ 裁剪并下载</button>
+            <button class="btn btn-danger" id="crop-reset">↩️ 重新选择</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 等分拆分 ========== -->
+  <div class="panel" id="panel-split">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>上传图片</div>
+      <div class="upload-zone" id="split-upload">
+        <div class="upload-icon">📁</div>
+        <div class="upload-title">点击或拖放图片到此处</div>
+        <div class="upload-sub">支持批量选择，每张将拆分为 n×n 个等大图片</div>
+        <input type="file" id="split-file" multiple accept="image/*">
+      </div>
+      <div class="preview-area" id="split-preview"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>拆分设置</div>
+      <p style="font-size:13px;color:var(--fg-muted);margin-bottom:12px;">选择 n 值，每张图将拆成 n² 张等大图片（例如 n=3 → 9张）</p>
+      <div class="split-n-selector" id="split-n-selector">
+        <button class="split-n-btn active" data-n="2">2</button>
+        <button class="split-n-btn" data-n="3">3</button>
+        <button class="split-n-btn" data-n="4">4</button>
+        <button class="split-n-btn" data-n="5">5</button>
+        <button class="split-n-btn" data-n="6">6</button>
+        <button class="split-n-btn" data-n="7">7</button>
+        <button class="split-n-btn" data-n="8">8</button>
+      </div>
+      <div class="split-n-label">n × n = <strong id="split-count">4</strong> 张/图</div>
+
+      <div class="control-row" style="margin-top:16px;">
+        <div class="control-group">
+          <label>输出格式</label>
+          <select id="split-format">
+            <option value="image/png">PNG</option>
+            <option value="image/jpeg">JPG</option>
+            <option value="image/webp">WebP</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>质量</label>
+          <div class="quality-control">
+            <input type="range" id="split-quality" min="10" max="100" value="95">
+            <span class="quality-val" id="split-quality-val">95%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions-bar">
+        <button class="btn btn-primary" id="split-btn" disabled>🔲 批量拆分并下载</button>
+        <button class="btn btn-secondary" id="split-clear">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <!-- 拆分预览 -->
+    <div class="card" id="split-result-card" style="display:none;">
+      <div class="card-title"><span class="dot"></span>拆分预览</div>
+      <div id="split-result-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Processing overlay -->
+<div class="processing" id="processing">
+  <div class="processing-card">
+    <div class="spinner"></div>
+    <div class="processing-text" id="processing-text">处理中...</div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* =========================================
+   工具函数
+   ========================================= */
+
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(40px)'; t.style.transition = 'all 0.3s'; }, 2500);
+  setTimeout(() => t.remove(), 2800);
+}
+
+function showProcessing(text = '处理中...') {
+  document.getElementById('processing-text').textContent = text;
+  document.getElementById('processing').classList.add('show');
+}
+function hideProcessing() {
+  document.getElementById('processing').classList.remove('show');
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function extForMime(mime) {
+  const map = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/bmp': '.bmp' };
+  return map[mime] || '.png';
+}
+
+/* =========================================
+   Tab 切换
+   ========================================= */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+/* =========================================
+   通用：Upload Zone
+   ========================================= */
+function initUploadZone(zoneEl, inputEl, onFiles) {
+  zoneEl.addEventListener('click', () => inputEl.click());
+  zoneEl.addEventListener('dragover', e => { e.preventDefault(); zoneEl.classList.add('dragover'); });
+  zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('dragover'));
+  zoneEl.addEventListener('drop', e => {
+    e.preventDefault(); zoneEl.classList.remove('dragover');
+    if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files);
+  });
+  inputEl.addEventListener('change', () => {
+    if (inputEl.files.length) onFiles(inputEl.files);
+    inputEl.value = '';
+  });
+}
+
+/* =========================================
+   格式转换
+   ========================================= */
+const convertFiles = [];
+
+initUploadZone(
+  document.getElementById('convert-upload'),
+  document.getElementById('convert-file'),
+  files => {
+    for (const f of files) {
+      if (f.type.startsWith('image/')) convertFiles.push(f);
+    }
+    renderConvertPreview();
+    updateConvertBtn();
+    showToast(`已添加 ${files.length} 张图片`, 'success');
+  }
+);
+
+function renderConvertPreview() {
+  const area = document.getElementById('convert-preview');
+  area.innerHTML = '';
+  convertFiles.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'preview-item';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    div.appendChild(img);
+    const info = document.createElement('div');
+    info.className = 'img-info';
+    info.textContent = `${f.name} · ${formatSize(f.size)}`;
+    div.appendChild(info);
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '✕';
+    btn.onclick = (e) => { e.stopPropagation(); convertFiles.splice(i, 1); renderConvertPreview(); updateConvertBtn(); };
+    div.appendChild(btn);
+    area.appendChild(div);
+  });
+}
+
+function updateConvertBtn() {
+  document.getElementById('convert-btn').disabled = convertFiles.length === 0;
+}
+
+// Quality slider
+const qualitySlider = document.getElementById('convert-quality');
+const qualityVal = document.getElementById('convert-quality-val');
+qualitySlider.oninput = () => qualityVal.textContent = qualitySlider.value + '%';
+
+// Hide quality for PNG/BMP
+document.getElementById('convert-format').addEventListener('change', e => {
+  const show = (e.target.value === 'image/jpeg' || e.target.value === 'image/webp');
+  document.getElementById('quality-group').style.display = show ? '' : 'none';
+});
+
+// Convert
+document.getElementById('convert-btn').addEventListener('click', async () => {
+  if (!convertFiles.length) return;
+  showProcessing(`正在转换 ${convertFiles.length} 张图片...`);
+  const mime = document.getElementById('convert-format').value;
+  const quality = parseInt(qualitySlider.value) / 100;
+  const needsQuality = mime === 'image/jpeg' || mime === 'image/webp';
+  const ext = extForMime(mime);
+
+  for (let i = 0; i < convertFiles.length; i++) {
+    const f = convertFiles[i];
+    try {
+      const img = await loadImage(f);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, needsQuality ? quality : undefined));
+      const baseName = f.name.replace(/\.[^.]+$/, '');
+      downloadBlob(blob, `${baseName}${ext}`);
+      URL.revokeObjectURL(img.src);
+    } catch (err) {
+      showToast(`${f.name} 转换失败: ${err.message}`, 'error');
+    }
+  }
+  hideProcessing();
+  showToast(`已完成 ${convertFiles.length} 张图片的格式转换`, 'success');
+});
+
+document.getElementById('convert-clear').addEventListener('click', () => {
+  convertFiles.length = 0;
+  renderConvertPreview();
+  updateConvertBtn();
+});
+
+/* =========================================
+   裁剪 - 约束式（数值输入 + 比例锁定）
+   ========================================= */
+let cropImg = null;
+let cropRatio = 0;
+
+const cropCanvas = document.getElementById('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d');
+const cropContainer = document.querySelector('.crop-preview-wrap');
+
+// 输入框元素
+const inputX = document.getElementById('crop-x');
+const inputY = document.getElementById('crop-y');
+const inputW = document.getElementById('crop-w');
+const inputH = document.getElementById('crop-h');
+const outputW = document.getElementById('crop-out-w');
+const outputH = document.getElementById('crop-out-h');
+const lockIndicator = document.getElementById('lock-indicator');
+
+// 初始化上传
+initUploadZone(
+  document.getElementById('crop-upload'),
+  document.getElementById('crop-file'),
+  async files => {
+    const f = files[0];
+    if (!f || !f.type.startsWith('image/')) return;
+    try {
+      cropImg = await loadImage(f);
+      initCropEditor();
+      document.getElementById('crop-editor-card').style.display = '';
+      showToast('图片已加载，可通过数值精确控制裁剪区域', 'success');
+    } catch (e) { showToast('图片加载失败', 'error'); }
+  }
+);
+
+function initCropEditor() {
+  if (!cropImg) return;
+  
+  // 计算画布尺寸（适应容器）
+  const maxW = cropContainer.clientWidth - 24 || 600;
+  const scale = Math.min(1, maxW / cropImg.naturalWidth);
+  cropCanvas.width = cropImg.naturalWidth * scale;
+  cropCanvas.height = cropImg.naturalHeight * scale;
+  cropCanvas._scale = scale;
+  
+  // 初始化裁剪区域为全图
+  inputX.max = cropImg.naturalWidth;
+  inputY.max = cropImg.naturalHeight;
+  inputW.max = cropImg.naturalWidth;
+  inputH.max = cropImg.naturalHeight;
+  
+  inputX.value = 0;
+  inputY.value = 0;
+  inputW.value = cropImg.naturalWidth;
+  inputH.value = cropImg.naturalHeight;
+  
+  drawCropPreview();
+}
+
+function drawCropPreview() {
+  if (!cropImg) return;
+  
+  const scale = cropCanvas._scale || 1;
+  const x = parseInt(inputX.value) || 0;
+  const y = parseInt(inputY.value) || 0;
+  const w = parseInt(inputW.value) || 1;
+  const h = parseInt(inputH.value) || 1;
+  
+  // 清空并绘制原图
+  cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+  cropCtx.drawImage(cropImg, 0, 0, cropCanvas.width, cropCanvas.height);
+  
+  // 绘制半透明遮罩
+  cropCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+  
+  // 清除裁剪区域的遮罩，显示原图
+  cropCtx.clearRect(x * scale, y * scale, w * scale, h * scale);
+  cropCtx.drawImage(
+    cropImg,
+    x, y, w, h,  // 源区域
+    x * scale, y * scale, w * scale, h * scale  // 目标区域
+  );
+  
+  // 绘制裁剪框边框
+  cropCtx.strokeStyle = '#f59e0b';
+  cropCtx.lineWidth = 2;
+  cropCtx.setLineDash([6, 4]);
+  cropCtx.strokeRect(x * scale, y * scale, w * scale, h * scale);
+  cropCtx.setLineDash([]);
+  
+  // 绘制网格线（三分线）
+  cropCtx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+  cropCtx.lineWidth = 1;
+  const thirdW = (w * scale) / 3;
+  const thirdH = (h * scale) / 3;
+  for (let i = 1; i < 3; i++) {
+    cropCtx.beginPath();
+    cropCtx.moveTo(x * scale + thirdW * i, y * scale);
+    cropCtx.lineTo(x * scale + thirdW * i, (y + h) * scale);
+    cropCtx.stroke();
+    cropCtx.beginPath();
+    cropCtx.moveTo(x * scale, y * scale + thirdH * i);
+    cropCtx.lineTo((x + w) * scale, y * scale + thirdH * i);
+    cropCtx.stroke();
+  }
+  
+  // 更新输出尺寸显示
+  outputW.textContent = w;
+  outputH.textContent = h;
+}
+
+// 输入框事件：约束值范围
+function clampCropInput() {
+  if (!cropImg) return;
+  
+  const imgW = cropImg.naturalWidth;
+  const imgH = cropImg.naturalHeight;
+  
+  let x = Math.max(0, Math.min(parseInt(inputX.value) || 0, imgW - 1));
+  let y = Math.max(0, Math.min(parseInt(inputY.value) || 0, imgH - 1));
+  let w = Math.max(1, Math.min(parseInt(inputW.value) || 1, imgW - x));
+  let h = Math.max(1, Math.min(parseInt(inputH.value) || 1, imgH - y));
+  
+  // 比例锁定：根据改变的是宽度还是高度来调整
+  if (cropRatio > 0) {
+    const targetW = h * cropRatio;
+    const targetH = w / cropRatio;
+    
+    if (targetW <= imgW - x) {
+      w = Math.round(targetW);
+    } else {
+      w = imgW - x;
+      h = Math.round(w / cropRatio);
+    }
+  }
+  
+  inputX.value = x;
+  inputY.value = y;
+  inputW.value = w;
+  inputH.value = h;
+  
+  drawCropPreview();
+}
+
+[inputX, inputY, inputW, inputH].forEach(input => {
+  input.addEventListener('input', clampCropInput);
+});
+
+// 比例锁定切换
+document.getElementById('crop-ratio').addEventListener('change', function() {
+  cropRatio = parseFloat(this.value);
+  if (cropRatio > 0) {
+    lockIndicator.className = 'lock-indicator locked';
+    lockIndicator.innerHTML = '<span>🔒</span> 已锁定';
+    // 应用比例到当前宽度
+    const w = parseInt(inputW.value);
+    inputH.value = Math.round(w / cropRatio);
+    clampCropInput();
+    showToast(`比例已锁定为 ${this.options[this.selectedIndex].text}`, 'info');
+  } else {
+    lockIndicator.className = 'lock-indicator unlocked';
+    lockIndicator.innerHTML = '<span>🔓</span> 未锁定';
+  }
+});
+
+// 快捷预设
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!cropImg) return;
+    
+    const imgW = cropImg.naturalWidth;
+    const imgH = cropImg.naturalHeight;
+    const preset = btn.dataset.preset;
+    
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    switch (preset) {
+      case 'full':
+        inputX.value = 0;
+        inputY.value = 0;
+        inputW.value = imgW;
+        inputH.value = imgH;
+        break;
+      case 'center-50':
+        inputX.value = Math.round(imgW * 0.25);
+        inputY.value = Math.round(imgH * 0.25);
+        inputW.value = Math.round(imgW * 0.5);
+        inputH.value = Math.round(imgH * 0.5);
+        break;
+      case 'center-75':
+        inputX.value = Math.round(imgW * 0.125);
+        inputY.value = Math.round(imgH * 0.125);
+        inputW.value = Math.round(imgW * 0.75);
+        inputH.value = Math.round(imgH * 0.75);
+        break;
+      case 'top-half':
+        inputX.value = 0;
+        inputY.value = 0;
+        inputW.value = imgW;
+        inputH.value = Math.round(imgH * 0.5);
+        break;
+      case 'bottom-half':
+        inputX.value = 0;
+        inputY.value = Math.round(imgH * 0.5);
+        inputW.value = imgW;
+        inputH.value = Math.round(imgH * 0.5);
+        break;
+    }
+    
+    // 如果有比例锁定，重新应用
+    if (cropRatio > 0) {
+      inputH.value = Math.round(parseInt(inputW.value) / cropRatio);
+    }
+    
+    clampCropInput();
+  });
+});
+
+// 执行裁剪
+document.getElementById('crop-btn').addEventListener('click', () => {
+  if (!cropImg) return;
+  
+  const x = parseInt(inputX.value);
+  const y = parseInt(inputY.value);
+  const w = parseInt(inputW.value);
+  const h = parseInt(inputH.value);
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(cropImg, x, y, w, h, 0, 0, w, h);
+  
+  const mime = document.getElementById('crop-format').value;
+  const quality = parseInt(document.getElementById('crop-quality').value) / 100;
+  const needsQ = mime === 'image/jpeg' || mime === 'image/webp';
+  
+  canvas.toBlob(blob => {
+    downloadBlob(blob, `cropped_${w}x${h}${extForMime(mime)}`);
+    showToast(`裁剪完成：${w}×${h} px`, 'success');
+  }, mime, needsQ ? quality : undefined);
+});
+
+// 重置
+document.getElementById('crop-reset').addEventListener('click', () => {
+  cropImg = null;
+  cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+  document.getElementById('crop-editor-card').style.display = 'none';
+  document.getElementById('crop-ratio').value = '0';
+  cropRatio = 0;
+  lockIndicator.className = 'lock-indicator unlocked';
+  lockIndicator.innerHTML = '<span>🔓</span> 未锁定';
+});
+
+/* =========================================
+   等分拆分
+   ========================================= */
+const splitFiles = [];
+let splitN = 2;
+
+initUploadZone(
+  document.getElementById('split-upload'),
+  document.getElementById('split-file'),
+  files => {
+    for (const f of files) {
+      if (f.type.startsWith('image/')) splitFiles.push(f);
+    }
+    renderSplitPreview();
+    updateSplitBtn();
+    showToast(`已添加 ${files.length} 张图片`, 'success');
+  }
+);
+
+function renderSplitPreview() {
+  const area = document.getElementById('split-preview');
+  area.innerHTML = '';
+  splitFiles.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'preview-item';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    div.appendChild(img);
+    const info = document.createElement('div');
+    info.className = 'img-info';
+    info.textContent = `${f.name} · ${formatSize(f.size)}`;
+    div.appendChild(info);
+    const btn = document.createElement('div');
+    btn.className = 'remove-btn';
+    btn.textContent = '✕';
+    btn.onclick = (e) => { e.stopPropagation(); splitFiles.splice(i, 1); renderSplitPreview(); updateSplitBtn(); };
+    div.appendChild(btn);
+    area.appendChild(div);
+  });
+}
+
+function updateSplitBtn() {
+  document.getElementById('split-btn').disabled = splitFiles.length === 0;
+}
+
+// N selector
+document.querySelectorAll('.split-n-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.split-n-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    splitN = parseInt(btn.dataset.n);
+    document.getElementById('split-count').textContent = splitN * splitN;
+  });
+});
+
+document.getElementById('split-quality').addEventListener('input', function() {
+  document.getElementById('split-quality-val').textContent = this.value + '%';
+});
+
+// Split action
+document.getElementById('split-btn').addEventListener('click', async () => {
+  if (!splitFiles.length) return;
+  showProcessing(`正在拆分 ${splitFiles.length} 张图片为 ${splitN}×${splitN}...`);
+  const mime = document.getElementById('split-format').value;
+  const quality = parseInt(document.getElementById('split-quality').value) / 100;
+  const needsQ = mime === 'image/jpeg' || mime === 'image/webp';
+  const ext = extForMime(mime);
+  const resultCard = document.getElementById('split-result-card');
+  const resultContent = document.getElementById('split-result-content');
+  resultContent.innerHTML = '';
+
+  for (const f of splitFiles) {
+    try {
+      const img = await loadImage(f);
+      const pw = Math.floor(img.naturalWidth / splitN);
+      const ph = Math.floor(img.naturalHeight / splitN);
+      const baseName = f.name.replace(/\.[^.]+$/, '');
+
+      // Build preview grid for this image
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size:14px;font-weight:600;margin:16px 0 8px;color:var(--fg);';
+      label.textContent = `📷 ${f.name} → ${splitN}×${splitN}（每块 ${pw}×${ph} px）`;
+      resultContent.appendChild(label);
+      const grid = document.createElement('div');
+      grid.className = 'split-preview';
+      grid.style.gridTemplateColumns = `repeat(${splitN}, 1fr)`;
+      resultContent.appendChild(grid);
+
+      for (let row = 0; row < splitN; row++) {
+        for (let col = 0; col < splitN; col++) {
+          const canvas = document.createElement('canvas');
+          canvas.width = pw;
+          canvas.height = ph;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, col * pw, row * ph, pw, ph, 0, 0, pw, ph);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, needsQ ? quality : undefined));
+          const fileName = `${baseName}_${splitN}x${splitN}_r${row + 1}c${col + 1}${ext}`;
+          downloadBlob(blob, fileName);
+
+          // Preview thumbnail
+          const thumb = document.createElement('img');
+          thumb.src = URL.createObjectURL(blob);
+          thumb.title = fileName;
+          grid.appendChild(thumb);
+        }
+      }
+      URL.revokeObjectURL(img.src);
+    } catch (err) {
+      showToast(`${f.name} 拆分失败: ${err.message}`, 'error');
+    }
+  }
+
+  resultCard.style.display = '';
+  hideProcessing();
+  showToast(`已完成 ${splitFiles.length} 张图片的等分拆分（每张 ${splitN * splitN} 块）`, 'success');
+});
+
+document.getElementById('split-clear').addEventListener('click', () => {
+  splitFiles.length = 0;
+  renderSplitPreview();
+  updateSplitBtn();
+  document.getElementById('split-result-card').style.display = 'none';
+  document.getElementById('split-result-content').innerHTML = '';
+});
+
+/* Window resize: redraw crop canvas */
+window.addEventListener('resize', () => { if (cropImg) { drawCropPreview(); } });
+</script>
+</body>
+</html>
